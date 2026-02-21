@@ -1,0 +1,8 @@
+<digit> ::= [0-9]
+<letter> ::= [a-zA-Z_]
+<id> ::= <letter> {<letter> | <digit>}
+<number> ::= {<digit>} . [<digit>] e [<digit>]
+<binop> ::= + | - | / | *
+<parenth> ::= ( <expr> )
+<primary> ::= <id> | <number> | <parenth>
+<expr> ::= <primary> [<binop> <primary>]
