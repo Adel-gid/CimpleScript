@@ -19,7 +19,7 @@ int gettok(char* str, char** endp) {
 		int n = 0;
 		for (; isdigit(*str) && *str; ++n, ++str);
 		tempString = malloc(n+1);
-		memcpy(tempString, str, n);
+		memcpy(tempString, str-n, n);
 		tempString[n] = '\0';
 		*endp = str;
 		return tok_num;
@@ -28,7 +28,7 @@ int gettok(char* str, char** endp) {
 		int n = 0;
 		for (; (isalnum(*str) || *str == '_') && *str; ++n, ++str);
 		tempString = malloc(n+1);
-		memcpy(tempString, str, n);
+		memcpy(tempString, str-n, n);
 		tempString[n] = '\0';
 		*endp = str;
 		return tok_num;
