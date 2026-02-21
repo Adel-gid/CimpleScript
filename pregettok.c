@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <ctype.h>
+#include <string.h>
+#include <malloc.h>
 
 enum token {
 	tok_unknown,
@@ -9,27 +11,27 @@ enum token {
 	tok_rpar
 };
 
-char tempstring[4096];
+char* tempString = NULL;
 
 int gettok(char* str, char** endp) {
 	while (*str && isspace(*str)) ++str;
 	if (isdigit(*str)) {
-		int i = 0;
-		for (; i < 4096 && isdigit(*str) && *str; ++i, ++str) {
-			tempstring[i] = *str;
-		}
-		tempstring[i] = '\0';
+		int n = 0;
+		for (; isdigit(*str) && *str; ++n, ++str);
+		tempString = malloc(n+1);
+		memcpy(tempString, str, n);
+		tempString[n] = '\0';
 		*endp = str;
 		return tok_num;
 	}
 	if (isalpha(*str) || *str == '_') {
-		int i = 0;
-		for (; i < 4096 && ( isalnum(*str) || *str == '_') && *str; ++i, ++str) {
-			tempstring[i] = *str;
-		}
-		tempstring[i] = '\0';
+		int n = 0;
+		for (; (isalnum(*str) || *str == '_') && *str; ++n, ++str);
+		tempString = malloc(n+1);
+		memcpy(tempString, str, n);
+		tempString[n] = '\0';
 		*endp = str;
-		return tok_id;
+		return tok_num;
 	}
 	if (*str == '(') {
 		++str;
@@ -52,7 +54,8 @@ int main(int argc, char *argv[])
 	while (tok) {
 		printf("tok %d", tok);
 		if (tok == tok_num || tok == tok_id) {
-			printf(" %s\n", tempstring);
+			printf(" %s\n", tempString);
+			free(tempString);
 		}
 		else printf("\n");
 		tok = gettok(input, &input);
