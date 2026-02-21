@@ -2,6 +2,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <malloc.h>
+#include "object.h"
 
 enum token {
     tok_unknown,
@@ -279,56 +280,60 @@ void free_expr(expr_t* expr) {
     free(expr);
 }
 
-double eval(expr_t* expr) {
-    if (expr == NULL) return 0;
+CSObject* exec(expr_t* expr) {
     switch (expr->kind)
     {
-    case expr_id:
-        return 0;
-        break;
-    case expr_num:
-        return expr->number;
     case expr_binop:
-        double left = eval(expr->binop.left);
-        double right = eval(expr->binop.right);
-        switch (expr->binop.op)
         {
-        case tok_add:
-            return left + right;
-            break;
-        case tok_sub:
-            return left - right;
-        case tok_mul:
-            return left * right;
-        case tok_div:
-            return left / right;
-        default:
-            return 0;
-            break;
+            CSObject* left = exec(expr->binop.left);
+            CSObject* right = exec(expr->binop.right);
+            switch (expr->binop.op)
+            {
+            case tok_add:
+                return add(left, right);
+                break;
+            case tok_mul:
+                return mul(left, right);
+            default:
+                return NULL;
+                break;
+            }
         }
+        break;
     case expr_unop:
-        double _ex = eval(expr->unop.expr);
-        switch (expr->unop.op)
         {
-        case tok_sub:
-            return -_ex;
-            break;
-        
-        default:
-            break;
+            CSObject* o = exec(expr->unop.expr);
+            switch (expr->unop.op)
+            {
+            case tok_sub:
+                return neg(o);
+            default:
+                return NULL;
+                break;
+            }
         }
+    case expr_num:
+        return createDoubleObject(expr->number);
     default:
         break;
     }
-    return 0;
+    return NULL;
+}
+
+void print(CSObject* object) {
+    if (object->__class__ == getDoubleClass()) {
+        double* ld = object->objectData;
+        printf("%f\n", *ld);
+    }
+    decref(object);
 }
 
 int main(int argc, char *argv[])
 {
-    char* input = "-2 + 3 * 4";
+    char* input = "-2 + 3 * 6";
     expr_t* code = parse_code(input);
     print_tree(code, expr_id);
-    printf("%f\n", eval(code));
+    print(exec(code));
     free_expr(code);
     return expr_id;
 }
