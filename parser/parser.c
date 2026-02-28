@@ -36,6 +36,7 @@ enum token {
     tok_assign, //=
     tok_colon, //:
     tok_semicolon, //;
+    tok_comma, //,
 };
 
 char* tempString = NULL;
@@ -72,7 +73,9 @@ struct seq seqs[] = {
     {"==", tok_eq}, //==
     {"=", tok_assign}, //=
     {"{", tok_flpar},
-    {"}", tok_frpar}
+    {"}", tok_frpar},
+    {",", tok_comma},
+    {":", tok_colon},
 };
 
 int gettok(char* str, char** endp) {
@@ -222,12 +225,18 @@ expr_t* parse_primary(char** pos) {
 
 int getTokPrec(int tok) {
     switch (tok) {
+        case tok_assign:
+            return 1;
         case tok_lt: case tok_gt: case tok_le: case tok_ge: case tok_eq: 
             return 5; // Приоритет ниже, чем у сложения
         case tok_add: case tok_sub: 
             return 10;
         case tok_mul: case tok_div: 
             return 20;
+        case tok_colon:
+            return 35;
+        case tok_lpar:
+            return 40;
         default: 
             return -1;
     }
@@ -239,8 +248,46 @@ expr_t* parse_binop(char** pos, int prevPrec, expr_t* lhs) {
         if (curPrec < prevPrec) return lhs;
 
         int op = CurTok;
-        getNextToken(pos);                
-        expr_t* rhs = parse_primary(pos);
+        expr_t* rhs = NULL;
+        if (op == tok_lpar) {
+            getNextToken(pos); // Пропускаем '('
+            
+            expr_list_t* head = NULL;
+            expr_list_t* last = NULL;
+
+            // Обработка списка аргументов
+            if (CurTok != tok_rpar) { // Если сразу ')', то аргументов 0
+                while (1) {
+                    expr_t* arg = parse_expr(pos);
+                    if (!arg) return NULL;
+
+                    expr_list_t* node = malloc(sizeof(expr_list_t));
+                    node->expr = arg;
+                    node->next = NULL;
+
+                    if (!head) head = node;
+                    if (last) last->next = node;
+                    last = node;
+
+                    if (CurTok == tok_comma) {
+                        getNextToken(pos); // Пропускаем запятую и идем на след. круг
+                    } else if (CurTok == tok_rpar) {
+                        break; // Конец списка аргументов
+                    } else {
+                        return NULL; // Ошибка: ожидалась запятая или )
+                    }
+                }
+            }
+            getNextToken(pos); // Пропускаем ')'
+
+            // Создаем узел для списка аргументов
+            rhs = malloc(sizeof(expr_t));
+            rhs->kind = expr_list;
+            rhs->expr_list = head;
+        } else {
+            getNextToken(pos);
+            rhs = parse_primary(pos);
+        }
         if (!rhs) {
             free_expr(lhs);
             return NULL;
@@ -287,40 +334,41 @@ stmt_t* parse_expr_stmt(char** str) {
 }
 
 stmt_t* parse_stmt_list(char** str) {
-    printf("CurTok %d\n", CurTok);
-    getNextToken(str);
-    stmt_t* newStmt = NULL;
-    stmt_list_t* stmtListLast = NULL;
-    stmt_list_t* stmtListResult = NULL;
+    getNextToken(str); // пропускаем '{'
+    stmt_list_t* head = NULL;
+    stmt_list_t* tail = NULL;
+
     while (CurTok != tok_frpar) {
         while (CurTok == tok_eol) getNextToken(str);
         if (CurTok == tok_frpar) break;
-        newStmt = parse_stmt(str);
-        printf("CurTok %d\n", CurTok);
-        printf("newStmt:\n");
-        if (newStmt)
-            print_tree_stmt(newStmt, 4);
 
-        stmt_list_t* newStmtList = malloc(sizeof(stmt_list_t));
-        newStmtList->next = NULL;
-        newStmtList->stmt = newStmt;
-        if (stmtListLast != NULL) {
-            stmtListLast->next = newStmtList;
+        stmt_t* stmt = parse_stmt(str);
+        if (!stmt) {
+            // Ошибка, нужно очистить уже созданные узлы
+            // (упрощённо возвращаем NULL)
+            return NULL;
         }
-        stmtListLast = newStmtList;
-        if (stmtListResult == NULL) {
-            stmtListResult = stmtListLast;
-        }
+
+        stmt_list_t* node = malloc(sizeof(stmt_list_t));
+        node->stmt = stmt;
+        node->next = NULL;
+
+        if (!head) head = node;
+        else tail->next = node;
+        tail = node;
     }
+
+    getNextToken(str); // пропускаем '}'
+
     stmt_t* result = malloc(sizeof(stmt_t));
     result->kind = stmt_list;
-    result->stmt_list = stmtListResult;
+    result->stmt_list = head;
     return result;
 }
 
 stmt_t* parse_while_stmt(char** str) {
     getNextToken(str);
-    expr_t* cond = parse_parenth(str);
+    expr_t* cond = parse_expr(str);
     stmt_t* _true_stmt = parse_stmt(str);
     stmt_t* result = malloc(sizeof(stmt_t));
     result->kind = stmt_while;
@@ -386,6 +434,13 @@ int print_tree_expr(expr_t* expr, int tabs) {
         printf("right:\n");
         print_tree_expr(expr->binop.right, tabs+4);
         break;
+    case expr_list:
+        printf("(\n");
+        for (expr_list_t* i = expr->expr_list; i; i = i->next) {
+            print_tree_expr(i->expr, tabs+4);
+        }
+        for (int i = 0;i < tabs;++i) putchar(' ');
+        printf(")\n");
     default:
         break;
     }
@@ -406,6 +461,7 @@ int print_tree_stmt(stmt_t* stmt, int tabs) {
         print_tree_expr(stmt->if_stmt.condition, tabs+4);
         print_tree_stmt(stmt->if_stmt.stmt, tabs+4);
         if (stmt->if_stmt.elseStmt) {
+            for (int i = 0;i < tabs;++i) putchar(' ');
             printf("else:\n");
             print_tree_stmt(stmt->if_stmt.elseStmt, tabs+4);
         }
@@ -445,6 +501,15 @@ void free_expr(expr_t* expr) {
         break;
     case expr_id:
         free((void*)expr->id);
+        break;
+    case expr_list:
+        for (expr_list_t* i = expr->expr_list; i; ) {
+            expr_list_t* next = i->next;
+            free_expr(i->expr);
+            free(i);
+            i = next;
+        }
+        break;
     default:
         break;
     }
@@ -452,6 +517,7 @@ void free_expr(expr_t* expr) {
 }
 
 void free_stmt_list(stmt_list_t* stmt_list__) {
+    if (!stmt_list__) return;
     if (stmt_list__->stmt) {
         free_stmt(stmt_list__->stmt);
     }
@@ -486,36 +552,90 @@ void free_stmt(stmt_t* stmt) {
     free(stmt);
 }
 
-CSObject* execExpr(expr_t* expr) {
+CSObject* execExpr(CSScope* scope, expr_t* expr) {
+    if (expr == NULL) return NULL;
     switch (expr->kind)
     {
     case expr_binop:
         {
-            CSObject* left = execExpr(expr->binop.left);
-            CSObject* right = execExpr(expr->binop.right);
+            if (expr->binop.op == tok_colon) {
+                if (expr->binop.left->kind != expr_id ||
+                    expr->binop.right->kind != expr_id) 
+                    return createExceptionObject("TypeError", NULL, 0, 0, "Expected identifer");
+                const char* name = expr->binop.left->id;
+                const char* className = expr->binop.right->id;
+                CSObject* result = scopeCreate(scope, name, className);
+                return result;
+            }
+            if (expr->binop.op == tok_lpar) {
+                CSObject* left = execExpr(scope, expr->binop.left);
+                int argc = 0;
+                expr_t* args = expr->binop.right;
+                for (expr_list_t* i = args->expr_list; i; i = i->next, ++argc);
+                CSObject** argv = malloc(sizeof(CSObject*)*argc);
+                argc = 0;
+                for (expr_list_t* i = args->expr_list; i; i = i->next, ++argc) {
+                    argv[argc] = execExpr(scope, i->expr);
+                }
+                CSObject* result = call(left, argc, argv);
+                for (int i = 0; i < argc; ++i) {
+                    decref(argv[i]);
+                }
+                free(argv);
+                return result;
+            }
+            CSObject* left = execExpr(scope, expr->binop.left);
+            CSObject* right = execExpr(scope, expr->binop.right);
+            CSObject* result = NULL;
             switch (expr->binop.op)
             {
             case tok_add:
-                return add(left, right);
+                result =  add(left, right);
                 break;
             case tok_mul:
-                return mul(left, right);
+                result =  mul(left, right);
                 break;
             case tok_sub:
-                return sub(left, right);
+                result =  sub(left, right);
                 break;
             case tok_div:
-                return _div(left, right);
+                result =  _div(left, right);
+                break;
+            case tok_lt:
+                result = lt(left, right);
+                break;
+            case tok_gt:
+                result = gt(left, right);
+                break;
+            case tok_assign:
+                {
+                    CSObject* result = set(left, right);
+                    decref(right);
+                    return result;
+                }
                 break;
             default:
                 return NULL;
                 break;
             }
+            decref(left);
+            decref(right);
+            return result;
         }
         break;
+    case expr_id:
+        {
+            CSObject* object = scopeGet(scope, expr->id);
+            if (object == NULL) {
+                return createExceptionObject(
+                    "VariableName", NULL, 0, 0, "Don't find var"
+                );
+            }
+            return object;
+        }
     case expr_unop:
         {
-            CSObject* o = execExpr(expr->unop.expr);
+            CSObject* o = execExpr(scope, expr->unop.expr);
             switch (expr->unop.op)
             {
             case tok_sub:
@@ -533,8 +653,52 @@ CSObject* execExpr(expr_t* expr) {
     return NULL;
 }
 
-void print(CSObject* object) {
-    CSObject* _str = str(object);
-    printf("%s ", getCStr(_str));
-    decref(_str);
+CSObject* execStmt(CSScope* scope, stmt_t* stmt) {
+    if (stmt == NULL) return NULL;
+    switch (stmt->kind)
+    {
+    case stmt_expr:
+        return execExpr(scope, stmt->expr);
+        break;
+    case stmt_while:
+        while (1) {
+            CSObject* _cond = execExpr(scope, stmt->while_stmt.condition);
+            int _boolean = toCBool(_cond);
+            decref(_cond);
+            if (!_boolean) break;
+            execStmt(scope, stmt->while_stmt.stmt);
+        }
+        return NULL;
+    case stmt_if:
+        {
+            CSObject* _cond = execExpr(scope, stmt->while_stmt.condition);
+            int _boolean = toCBool(_cond);
+            decref(_cond);
+            if (_boolean) {
+                execStmt(scope, stmt->if_stmt.stmt);
+            }
+            else {
+                execStmt(scope, stmt->if_stmt.elseStmt);
+            }
+            return NULL;
+        }
+    case stmt_list:
+        {
+            CSScope newScope = {
+                .vars = NULL,
+                .parent = scope
+            };
+            stmt_list_t* current = stmt->stmt_list;
+            while (current) {
+                CSObject* _expr = execStmt(&newScope, current->stmt);
+                current = current->next;
+            }
+            scopeClean(&newScope);
+            return NULL;
+        }
+    default:
+        break;
+    }
+    return NULL;
 }
+

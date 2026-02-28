@@ -36,10 +36,28 @@ CSObject* double_div(CSObject* left, CSObject* right) {
     return createDoubleObject(*ld / *rd);
 }
 
+
+CSObject* double_lt(CSObject* left, CSObject* right) {
+    TYPE_CHECK(left, "double");
+    TYPE_CHECK(right, "double");
+    double* ld = left->objectData;
+    double* rd = right->objectData;
+    return createBoolObject(*ld < *rd);
+}
+
+CSObject* double_gt(CSObject* left, CSObject* right) {
+    TYPE_CHECK(left, "double");
+    TYPE_CHECK(right, "double");
+    double* ld = left->objectData;
+    double* rd = right->objectData;
+    return createBoolObject(*ld > *rd);
+}
+
 CSObject* double_neg(CSObject* o) {
     double* ld = o->objectData;
     return createDoubleObject(-(*ld));
 }
+
 
 int countAfterDecimalPoint(double f) {
 
@@ -63,7 +81,14 @@ CSObject* double_str(CSObject* o) {
     return createStringObject(buff);
 }
 
-
+CSObject* double_set(CSObject* left, CSObject* right) {
+    TYPE_CHECK(left, "double");
+    TYPE_CHECK(right, "double");
+    double* ld = left->objectData;
+    double* rd = right->objectData;
+    *ld = *rd;
+    return left;
+}
 
 CSInterface double_interface = {
     .__add__ = double_add,
@@ -72,6 +97,9 @@ CSInterface double_interface = {
     .__str__ = double_str,
     .__div__ = double_div,
     .__sub__ = double_sub,
+    .__lt__  = double_lt,
+    .__gt__  = double_gt,
+    .__set__ = double_set
 };
 
 CSClass double_class = {
@@ -85,7 +113,7 @@ CSClass* getDoubleClass() {
 }
 
 CSObject* createDoubleObject(double i) {
-    CSObject* object = createObject(&double_class);
+    CSObject* object = createObject(&double_class, 1);
     double* _data = object->objectData;
     *_data = i;
     return object;

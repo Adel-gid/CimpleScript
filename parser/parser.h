@@ -82,7 +82,7 @@ void free_stmt(stmt_t* stmt);
 
 stmt_t* parse_code(char* input);
 
-CSObject* execExpr(expr_t* expr);
-CSObject* execStmt(stmt_t* stmt);
+CSObject* execExpr(CSScope* scope, expr_t* expr);
+CSObject* execStmt(CSScope* scope, stmt_t* stmt);
 
 #endif

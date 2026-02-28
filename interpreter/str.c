@@ -45,7 +45,7 @@ CSClass* getStringClass() {
 
 CSObject* createStringObject(const char* str) {
 
-    CSObject* result = createObject(&stringClass);
+    CSObject* result = createObject(&stringClass, 1);
     StringObject* objData = result->objectData;
     objData->__cstr = strdup(str);
     return result;
