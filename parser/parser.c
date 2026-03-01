@@ -5,42 +5,12 @@
 #include "../interpreter/object.h"
 #include "parser.h"
 
-enum token {
-    tok_unknown,
-    tok_eol,
-    tok_eof,
-    tok_id,
-    tok_num,
-    tok_lpar, // (
-    tok_rpar, // )
-    tok_flpar, // {
-    tok_frpar, // }
-    tok_str,
-    tok_while,
-    tok_for,
-    tok_function,
-    tok_class,
-    tok_if,
-    tok_else,
-    tok_add,
-    tok_sub,
-    tok_mul,
-    tok_div,
-    tok_arrow, //->
-    tok_point, //.
-    tok_lt, //<
-    tok_gt, //>
-    tok_le, //<=
-    tok_ge, //>=
-    tok_eq, //==
-    tok_assign, //=
-    tok_colon, //:
-    tok_semicolon, //;
-    tok_comma, //,
-};
 
 char* tempString = NULL;
 
+
+//base structure for sequences
+//it's needed to use seq_table
 struct seq {
     const char* _str;
     int tok;
@@ -52,12 +22,12 @@ struct seq keywords[] = {
     {"function", tok_function},
     {"class", tok_class},
     {"if", tok_if},
-    {"else", tok_else}
+    {"else", tok_else},
+    {"return", tok_return}
 };
 
 struct seq seqs[] = {
     {"\n", tok_eol},
-    {"\r", tok_eol},
     {"+", tok_add},
     {"-", tok_sub},
     {"/", tok_div},
@@ -66,20 +36,25 @@ struct seq seqs[] = {
     {")", tok_rpar},
     {"->", tok_arrow}, //->
     {".", tok_point}, //.
-    {"<", tok_lt}, //<
-    {">", tok_gt}, //>
     {"<=", tok_le}, //<=
     {">=", tok_ge}, //>=
     {"==", tok_eq}, //==
     {"=", tok_assign}, //=
+    {"<", tok_lt}, //<
+    {">", tok_gt}, //>
     {"{", tok_flpar},
     {"}", tok_frpar},
     {",", tok_comma},
     {":", tok_colon},
 };
 
+const char* input = NULL;
+
 int gettok(char* str, char** endp) {
-    while (*str && isspace(*str)) ++str;
+    if (input == NULL) {
+        input = str;
+    }
+    while (*str && (*str == ' ' || *str == '\t' || *str == '\r')) ++str;
     if (*str == '\0') {
         *endp = NULL;
         return tok_eof;
@@ -137,6 +112,8 @@ int gettok(char* str, char** endp) {
             return i->tok;
         }
     }
+    printf("Token unknown. PANIC! %hhu %llu\n", *str, str - input);
+    for(;;);
     return tok_unknown;
 }
 
@@ -149,7 +126,8 @@ int CurTok = 0;
 void free_expr(expr_t* expr);
 
 int getNextToken(char** pos) {
-    return CurTok = gettok(*pos, pos);
+    CurTok = gettok(*pos, pos);
+    return CurTok;
 }
 
 expr_t* parse_number(char** pos) {
@@ -217,6 +195,7 @@ expr_t* parse_primary(char** pos) {
             expr = parse_unop(pos);
             break;
         default:
+            printf("CurTok %u\n", CurTok);
             return NULL;
     }
     return expr;
@@ -259,7 +238,10 @@ expr_t* parse_binop(char** pos, int prevPrec, expr_t* lhs) {
             if (CurTok != tok_rpar) { // Если сразу ')', то аргументов 0
                 while (1) {
                     expr_t* arg = parse_expr(pos);
-                    if (!arg) return NULL;
+                    if (!arg)  {
+                        printf("error with arg\n");
+                        return NULL;
+                    }
 
                     expr_list_t* node = malloc(sizeof(expr_list_t));
                     node->expr = arg;
@@ -274,6 +256,7 @@ expr_t* parse_binop(char** pos, int prevPrec, expr_t* lhs) {
                     } else if (CurTok == tok_rpar) {
                         break; // Конец списка аргументов
                     } else {
+                        printf("expected comma or rpar\n");
                         return NULL; // Ошибка: ожидалась запятая или )
                     }
                 }
@@ -314,17 +297,14 @@ expr_t* parse_binop(char** pos, int prevPrec, expr_t* lhs) {
 
 expr_t* parse_expr(char** pos) {
     expr_t* lhs = parse_primary(pos);
-    if (!lhs) return NULL;
+    if (!lhs) {
+        printf("error with parse_primary lhs\n");
+        return NULL;
+    }
     return parse_binop(pos, 0, lhs);
 }
 
 stmt_t* parse_stmt(char** input);
-
-stmt_t* parse_code(char* str) {
-    char* pos = str;
-    getNextToken(&pos);
-    return parse_stmt(&pos);
-}
 
 stmt_t* parse_expr_stmt(char** str) {
     stmt_t* newStmt = malloc(sizeof(stmt_t));
@@ -394,6 +374,17 @@ stmt_t* parse_if_stmt(char** str) {
     return result;
 }
 
+int is_infunction = 0;
+
+stmt_t* parse_return(char** str) {
+    getNextToken(str);
+    expr_t* _return = parse_expr(str);
+    stmt_t* result = malloc(sizeof(stmt_t));
+    result->kind = stmt_return;
+    result->_return_stmt = _return;
+    return result;
+}
+
 stmt_t* parse_stmt(char** str) {
     switch (CurTok)
     {
@@ -404,10 +395,69 @@ stmt_t* parse_stmt(char** str) {
         return parse_if_stmt(str);
     case tok_flpar:
         return parse_stmt_list(str);
+    case tok_return:
+        return parse_return(str);
     default:
         break;
     }
     return parse_expr_stmt(str);
+}
+
+top_level_stmt_t* parse_function(char** pos) {
+    getNextToken(pos); //eat 'function' keyword
+    expr_t* def = parse_expr(pos);
+    stmt_t* body = parse_stmt(pos);
+    top_level_stmt_t* top_level = malloc(sizeof(top_level_stmt_t));
+    top_level->kind = top_level_func;
+    top_level->func_def.definition = def;
+    top_level->func_def.body = body;
+    return top_level;
+}
+
+top_level_stmt_t* parse_top_expr(char** pos) {
+    expr_t* _expr = parse_expr(pos);
+    top_level_stmt_t* top_level = malloc(sizeof(top_level_stmt_t));
+    top_level->kind = top_level_expr;
+    top_level->expr = _expr;
+    return top_level;
+}
+
+top_level_stmt_t* parse_top_stmt(char** pos) {
+    top_level_stmt_list_t* head = NULL;
+    top_level_stmt_list_t* tail = NULL;
+    while (1) {
+        top_level_stmt_t* _stmt = NULL;
+        while (CurTok == tok_eol) getNextToken(pos);
+        if (CurTok == tok_eof) break;
+        switch (CurTok)
+        {
+        case tok_function:
+            _stmt = parse_function(pos);
+            break;
+        default:
+            _stmt = parse_top_expr(pos);
+            break;
+        }
+        top_level_stmt_list_t* newList = malloc(sizeof(top_level_stmt_list_t));
+        newList->_stmt = _stmt;
+        newList->next = NULL;
+        if (tail) {
+            tail->next = newList;
+        }
+        tail = newList;
+        if (head == NULL) {
+            head = tail;
+        }
+    }
+    top_level_stmt_t* result = malloc(sizeof(top_level_stmt_t));
+    result->kind = top_level_list;
+    result->list = head;
+    return result;
+}
+
+top_level_stmt_t* parse_code(char* pos) {
+    getNextToken(&pos);
+    return parse_top_stmt(&pos);
 }
 
 int print_tree_expr(expr_t* expr, int tabs) {
@@ -488,6 +538,30 @@ int print_tree_stmt(stmt_t* stmt, int tabs) {
     }
 }
 
+int print_tree_top_stmt(top_level_stmt_t* top_stmt, int tabs) {
+    for (int i = 0;i < tabs;++i) putchar(' ');
+    if (top_stmt == NULL) printf("(null)\n");
+    switch (top_stmt->kind)
+    {
+    case top_level_func:
+        printf("function:\n");
+        for (int i = 0;i < tabs;++i) putchar(' ');
+        print_tree_expr(top_stmt->func_def.definition, tabs+4);
+        for (int i = 0;i < tabs;++i) putchar(' ');
+        print_tree_stmt(top_stmt->func_def.body, tabs+4);
+        break;
+    case top_level_expr:
+        return print_tree_expr(top_stmt->expr, tabs+4);
+    case top_level_list:
+        for (top_level_stmt_list_t* i = top_stmt->list; i; i = i->next) {
+            print_tree_top_stmt(i->_stmt, tabs+4);
+        }
+        for (int i = 0;i < tabs;++i) putchar(' ');
+    default:
+        break;
+    }
+}
+
 void free_expr(expr_t* expr) {
     if (expr == NULL) return;
     switch (expr->kind)
@@ -551,154 +625,3 @@ void free_stmt(stmt_t* stmt) {
     }
     free(stmt);
 }
-
-CSObject* execExpr(CSScope* scope, expr_t* expr) {
-    if (expr == NULL) return NULL;
-    switch (expr->kind)
-    {
-    case expr_binop:
-        {
-            if (expr->binop.op == tok_colon) {
-                if (expr->binop.left->kind != expr_id ||
-                    expr->binop.right->kind != expr_id) 
-                    return createExceptionObject("TypeError", NULL, 0, 0, "Expected identifer");
-                const char* name = expr->binop.left->id;
-                const char* className = expr->binop.right->id;
-                CSObject* result = scopeCreate(scope, name, className);
-                return result;
-            }
-            if (expr->binop.op == tok_lpar) {
-                CSObject* left = execExpr(scope, expr->binop.left);
-                int argc = 0;
-                expr_t* args = expr->binop.right;
-                for (expr_list_t* i = args->expr_list; i; i = i->next, ++argc);
-                CSObject** argv = malloc(sizeof(CSObject*)*argc);
-                argc = 0;
-                for (expr_list_t* i = args->expr_list; i; i = i->next, ++argc) {
-                    argv[argc] = execExpr(scope, i->expr);
-                }
-                CSObject* result = call(left, argc, argv);
-                for (int i = 0; i < argc; ++i) {
-                    decref(argv[i]);
-                }
-                free(argv);
-                return result;
-            }
-            CSObject* left = execExpr(scope, expr->binop.left);
-            CSObject* right = execExpr(scope, expr->binop.right);
-            CSObject* result = NULL;
-            switch (expr->binop.op)
-            {
-            case tok_add:
-                result =  add(left, right);
-                break;
-            case tok_mul:
-                result =  mul(left, right);
-                break;
-            case tok_sub:
-                result =  sub(left, right);
-                break;
-            case tok_div:
-                result =  _div(left, right);
-                break;
-            case tok_lt:
-                result = lt(left, right);
-                break;
-            case tok_gt:
-                result = gt(left, right);
-                break;
-            case tok_assign:
-                {
-                    CSObject* result = set(left, right);
-                    decref(right);
-                    return result;
-                }
-                break;
-            default:
-                return NULL;
-                break;
-            }
-            decref(left);
-            decref(right);
-            return result;
-        }
-        break;
-    case expr_id:
-        {
-            CSObject* object = scopeGet(scope, expr->id);
-            if (object == NULL) {
-                return createExceptionObject(
-                    "VariableName", NULL, 0, 0, "Don't find var"
-                );
-            }
-            return object;
-        }
-    case expr_unop:
-        {
-            CSObject* o = execExpr(scope, expr->unop.expr);
-            switch (expr->unop.op)
-            {
-            case tok_sub:
-                return neg(o);
-            default:
-                return NULL;
-                break;
-            }
-        }
-    case expr_num:
-        return createDoubleObject(expr->number);
-    default:
-        break;
-    }
-    return NULL;
-}
-
-CSObject* execStmt(CSScope* scope, stmt_t* stmt) {
-    if (stmt == NULL) return NULL;
-    switch (stmt->kind)
-    {
-    case stmt_expr:
-        return execExpr(scope, stmt->expr);
-        break;
-    case stmt_while:
-        while (1) {
-            CSObject* _cond = execExpr(scope, stmt->while_stmt.condition);
-            int _boolean = toCBool(_cond);
-            decref(_cond);
-            if (!_boolean) break;
-            execStmt(scope, stmt->while_stmt.stmt);
-        }
-        return NULL;
-    case stmt_if:
-        {
-            CSObject* _cond = execExpr(scope, stmt->while_stmt.condition);
-            int _boolean = toCBool(_cond);
-            decref(_cond);
-            if (_boolean) {
-                execStmt(scope, stmt->if_stmt.stmt);
-            }
-            else {
-                execStmt(scope, stmt->if_stmt.elseStmt);
-            }
-            return NULL;
-        }
-    case stmt_list:
-        {
-            CSScope newScope = {
-                .vars = NULL,
-                .parent = scope
-            };
-            stmt_list_t* current = stmt->stmt_list;
-            while (current) {
-                CSObject* _expr = execStmt(&newScope, current->stmt);
-                current = current->next;
-            }
-            scopeClean(&newScope);
-            return NULL;
-        }
-    default:
-        break;
-    }
-    return NULL;
-}
-

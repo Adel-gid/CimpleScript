@@ -53,6 +53,30 @@ CSObject* double_gt(CSObject* left, CSObject* right) {
     return createBoolObject(*ld > *rd);
 }
 
+CSObject* double_le(CSObject* left, CSObject* right) {
+    TYPE_CHECK(left, "double");
+    TYPE_CHECK(right, "double");
+    double* ld = left->objectData;
+    double* rd = right->objectData;
+    return createBoolObject(*ld <= *rd);
+}
+
+CSObject* double_ge(CSObject* left, CSObject* right) {
+    TYPE_CHECK(left, "double");
+    TYPE_CHECK(right, "double");
+    double* ld = left->objectData;
+    double* rd = right->objectData;
+    return createBoolObject(*ld >= *rd);
+}
+
+CSObject* double_eq(CSObject* left, CSObject* right) {
+    TYPE_CHECK(left, "double");
+    TYPE_CHECK(right, "double");
+    double* ld = left->objectData;
+    double* rd = right->objectData;
+    return createBoolObject(*ld == *rd);
+}
+
 CSObject* double_neg(CSObject* o) {
     double* ld = o->objectData;
     return createDoubleObject(-(*ld));
@@ -75,9 +99,9 @@ int countAfterDecimalPoint(double f) {
 
 CSObject* double_str(CSObject* o) {
     TYPE_CHECK(o, "double");
-    char buff[16];
+    char buff[64];
     double* ld = o->objectData;
-    int n = snprintf(buff, 16, "%.*f", countAfterDecimalPoint(*ld), *ld);
+    int n = snprintf(buff, 64, "%.*f", countAfterDecimalPoint(*ld), *ld);
     return createStringObject(buff);
 }
 
@@ -99,6 +123,9 @@ CSInterface double_interface = {
     .__sub__ = double_sub,
     .__lt__  = double_lt,
     .__gt__  = double_gt,
+    .__ge__  = double_ge,
+    .__le__  = double_le,
+    .__eq__  = double_eq,
     .__set__ = double_set
 };
 

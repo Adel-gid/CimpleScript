@@ -9,6 +9,11 @@ OBJS = $(patsubst %.c, obj/%.o, $(SRC))
 
 all: csi.exe
 
+setup:
+	mkdir obj
+	mkdir obj\interpreter
+	mkdir obj\parser
+
 obj/%.o:%.c
 	$(CC) -c $< -o $@ \
 	-Wall -Wextra -g \

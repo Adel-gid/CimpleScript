@@ -101,7 +101,7 @@ CSObject* lt(CSObject* left, CSObject* right) {
     if (left == NULL || right == NULL) return NULL;
     if (left->__class__ == NULL) return NULL;
     if (left->__class__->interface == NULL) return NULL;
-    if (left->__class__->interface->__div__ == NULL) return NULL;
+    if (left->__class__->interface->__lt__ == NULL) return NULL;
     CSObject* new = left->__class__->interface->__lt__(left, right);
     return new;
 }
@@ -110,7 +110,7 @@ CSObject* gt(CSObject* left, CSObject* right) {
     if (left == NULL || right == NULL) return NULL;
     if (left->__class__ == NULL) return NULL;
     if (left->__class__->interface == NULL) return NULL;
-    if (left->__class__->interface->__div__ == NULL) return NULL;
+    if (left->__class__->interface->__gt__ == NULL) return NULL;
     CSObject* new = left->__class__->interface->__gt__(left, right);
     return new;
 }
@@ -119,7 +119,7 @@ CSObject* le(CSObject* left, CSObject* right) {
     if (left == NULL || right == NULL) return NULL;
     if (left->__class__ == NULL) return NULL;
     if (left->__class__->interface == NULL) return NULL;
-    if (left->__class__->interface->__div__ == NULL) return NULL;
+    if (left->__class__->interface->__le__ == NULL) return NULL;
     CSObject* new = left->__class__->interface->__le__(left, right);
     return new;
 }
@@ -128,8 +128,17 @@ CSObject* ge(CSObject* left, CSObject* right) {
     if (left == NULL || right == NULL) return NULL;
     if (left->__class__ == NULL) return NULL;
     if (left->__class__->interface == NULL) return NULL;
-    if (left->__class__->interface->__div__ == NULL) return NULL;
+    if (left->__class__->interface->__ge__ == NULL) return NULL;
     CSObject* new = left->__class__->interface->__ge__(left, right);
+    return new;
+}
+
+CSObject* eq(CSObject* left, CSObject* right) {
+    if (left == NULL || right == NULL) return NULL;
+    if (left->__class__ == NULL) return NULL;
+    if (left->__class__->interface == NULL) return NULL;
+    if (left->__class__->interface->__eq__ == NULL) return NULL;
+    CSObject* new = left->__class__->interface->__eq__(left, right);
     return new;
 }
 

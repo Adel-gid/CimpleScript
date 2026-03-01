@@ -16,6 +16,7 @@ typedef CSObject*(*CSLessThanMethod)(CSObject*, CSObject*);
 typedef CSObject*(*CSGreaterThanMethod)(CSObject*, CSObject*);
 typedef CSObject*(*CSLessOrEqualMethod)(CSObject*, CSObject*);
 typedef CSObject*(*CSGreaterOrEqualMethod)(CSObject*, CSObject*);
+typedef CSObject*(*CSEqualMethod)(CSObject*, CSObject*);
 typedef CSObject*(*CSDeleteMethod)(CSObject*);
 typedef CSObject*(*CSCallMethod)(CSObject*, int, CSObject**);
 typedef CSObject*(*CSSetMethod)(CSObject*, CSObject*);
@@ -34,6 +35,7 @@ typedef struct CSInterface {
     CSDeleteMethod          __del__;
     CSCallMethod           __call__;
     CSSetMethod             __set__;
+    CSEqualMethod            __eq__;
 } CSInterface;
 
 typedef struct CSClass {
@@ -65,6 +67,7 @@ CSClass* getDoubleClass();
 CSClass* getStringClass();
 CSClass* getBoolClass();
 CSClass* getBuiltinFuncClass();
+CSClass* getFunctionClass();
 
 const char* getCStr(CSObject* object);
 

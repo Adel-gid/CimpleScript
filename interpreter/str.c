@@ -18,7 +18,7 @@ CSObject* strAdd(CSObject* left, CSObject* right) {
     TYPE_CHECK(right, "str");
     const char* cstr1 = getCStr(left);
     const char* cstr2 = getCStr(right);
-    int newSize = strlen(cstr1) + strlen(cstr2);
+    int newSize = strlen(cstr1) + strlen(cstr2)+1;
     char* _str = malloc(newSize);
     strcpy(_str, cstr1);
     strcat(_str, cstr2);
@@ -27,10 +27,13 @@ CSObject* strAdd(CSObject* left, CSObject* right) {
     return newStr;
 }
 
-
+CSObject* strStr(CSObject* _str) {
+    return _str;
+}
 
 CSInterface strInterface = {
-    .__add__ = strAdd
+    .__add__ = strAdd,
+    .__str__ = strStr
 };
 
 CSClass stringClass = {

@@ -1,4 +1,5 @@
 #include "object.h"
+#include <stdio.h>
 
 typedef struct BuiltinFunctionData {
     CSCallMethod __func;
@@ -31,10 +32,17 @@ CSClass* getBuiltinFuncClass() {
     return &builtinFunction;
 }
 
+CSObject* CSGetAddr(CSObject* self, int argc, CSObject** argv) {
+    char buff[64];
+    snprintf(buff, 64, "0x%llx", argv[0]);
+    return createStringObject(buff);
+}
+
 void CSPrint(CSObject* self, int argc, CSObject** argv) {
     for (int i = 0; i < argc; ++i) {
         CSObject* _str = str(argv[i]);
         printf("%s ", getCStr(_str));
-        decref(_str);
+        //decref(_str);
     }
+    putchar('\n');
 }
