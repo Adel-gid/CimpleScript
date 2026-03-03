@@ -50,11 +50,18 @@ struct seq seqs[] = {
 
 const char* input = NULL;
 
+int line = 1;
+int column = 1;
+const char* description = NULL;
+
 int gettok(char* str, char** endp) {
     if (input == NULL) {
         input = str;
     }
-    while (*str && (*str == ' ' || *str == '\t' || *str == '\r')) ++str;
+    while (*str && (*str == ' ' || *str == '\t' || *str == '\r')) {
+        ++str;
+        ++column;
+    }
     if (*str == '\0') {
         *endp = NULL;
         return tok_eof;
@@ -63,6 +70,7 @@ int gettok(char* str, char** endp) {
         int len = strlen(i->_str);
         if (strncmp(str, i->_str, len) == 0) {
             str += len;
+            column += len;
             *endp = str;
             return i->tok;
         }
@@ -72,6 +80,7 @@ int gettok(char* str, char** endp) {
         for (; isdigit(*str) && *str; ++n, ++str);
         tempString = malloc(n+1);
         memcpy(tempString, str-n, n);
+        column += n;
         tempString[n] = '\0';
         *endp = str;
         return tok_num;
@@ -82,6 +91,7 @@ int gettok(char* str, char** endp) {
         tempString = malloc(n+1);
         memcpy(tempString, str-n, n);
         tempString[n] = '\0';
+        column += n;
         *endp = str;
         return tok_id;
     }
@@ -90,16 +100,19 @@ int gettok(char* str, char** endp) {
         int quote_mark = *str;
         ++str;
         for (; *str != quote_mark && *str != '\n' && *str != '\r' && *str; ++n, ++str);
+
         tempString = malloc(n+1);
         memcpy(tempString, str-n, n);
         tempString[n] = '\0';
+        column += n+1;
+        ++str;
         *endp = str;
         return tok_str;
     }
     if (*str == '/') {
         ++str;
         if (*str == '/') {
-            while (*str && *str != '\n') ++str;
+            while (*str && *str != '\n') {++str; ++column;}
             return gettok(str, endp);
         }
         --str; //it's div operator
@@ -107,13 +120,17 @@ int gettok(char* str, char** endp) {
     for (struct seq* i = seqs; i < seqs + sizeof(seqs)/sizeof(*seqs); ++i) {
         int len = strlen(i->_str);
         if (strncmp(str, i->_str, len) == 0) {
+            if (*str == '\n') {
+                ++line;
+                column = 0;
+            }
             str += len;
+            column += len;
             *endp = str;
             return i->tok;
         }
     }
-    printf("Token unknown. PANIC! %hhu %llu\n", *str, str - input);
-    for(;;);
+    description = "Unknown token";
     return tok_unknown;
 }
 
@@ -145,6 +162,13 @@ expr_t* parse_id(char** pos) {
     expr->id = tempString;       
     return expr;
 }
+expr_t* parse_str(char** pos) {
+    expr_t* expr = malloc(sizeof(expr_t));
+    expr->kind = expr_str;
+    expr->id = tempString;       
+    return expr;
+}
+
 expr_t* parse_parenth(char** pos);
 
 
@@ -175,6 +199,15 @@ expr_t* parse_unop(char** pos) {
     return expr;
 }
 
+expr_t* expr_create_error(const char* description) {
+    expr_t* expr = malloc(sizeof(expr_t));
+    expr->_error.column = column;
+    expr->_error.line = line;
+    expr->_error.description = strdup(description);
+    expr->kind = expr_error;
+    return expr;
+}
+
 expr_t* parse_primary(char** pos) {
     expr_t* expr = NULL;
     switch (CurTok) {
@@ -186,6 +219,10 @@ expr_t* parse_primary(char** pos) {
             expr = parse_id(pos);
             getNextToken(pos);   
             break;
+        case tok_str:
+            expr = parse_str(pos);
+            getNextToken(pos);
+            break;
         case tok_lpar:
             expr = parse_parenth(pos);
             break;
@@ -194,9 +231,17 @@ expr_t* parse_primary(char** pos) {
         case tok_mul:             
             expr = parse_unop(pos);
             break;
+        case tok_unknown:
+            expr = expr_create_error(description);
+            return expr;
         default:
-            printf("CurTok %u\n", CurTok);
-            return NULL;
+            {
+                char buff[64];
+                sprintf(buff, "unknown error: %d", CurTok);
+                expr = expr_create_error(buff);
+                return expr;
+            }
+
     }
     return expr;
 }
@@ -238,10 +283,7 @@ expr_t* parse_binop(char** pos, int prevPrec, expr_t* lhs) {
             if (CurTok != tok_rpar) { // Если сразу ')', то аргументов 0
                 while (1) {
                     expr_t* arg = parse_expr(pos);
-                    if (!arg)  {
-                        printf("error with arg\n");
-                        return NULL;
-                    }
+                    if (arg->kind == expr_error) return arg;
 
                     expr_list_t* node = malloc(sizeof(expr_list_t));
                     node->expr = arg;
@@ -256,8 +298,7 @@ expr_t* parse_binop(char** pos, int prevPrec, expr_t* lhs) {
                     } else if (CurTok == tok_rpar) {
                         break; // Конец списка аргументов
                     } else {
-                        printf("expected comma or rpar\n");
-                        return NULL; // Ошибка: ожидалась запятая или )
+                        return expr_create_error("expected comma or rpar");
                     }
                 }
             }
@@ -271,18 +312,12 @@ expr_t* parse_binop(char** pos, int prevPrec, expr_t* lhs) {
             getNextToken(pos);
             rhs = parse_primary(pos);
         }
-        if (!rhs) {
-            free_expr(lhs);
-            return NULL;
-        }
+        if (rhs->kind == expr_error) return rhs;
 
         int nextPrec = getTokPrec(CurTok);
         if (curPrec < nextPrec) {
             rhs = parse_binop(pos, curPrec + 1, rhs);
-            if (!rhs) {
-                free_expr(lhs);
-                return NULL;
-            }
+            if (rhs->kind == expr_error) return rhs;
         }
 
         expr_t* node = malloc(sizeof(expr_t));
@@ -297,10 +332,7 @@ expr_t* parse_binop(char** pos, int prevPrec, expr_t* lhs) {
 
 expr_t* parse_expr(char** pos) {
     expr_t* lhs = parse_primary(pos);
-    if (!lhs) {
-        printf("error with parse_primary lhs\n");
-        return NULL;
-    }
+    if (lhs->kind == expr_error) return lhs;
     return parse_binop(pos, 0, lhs);
 }
 
@@ -323,12 +355,14 @@ stmt_t* parse_stmt_list(char** str) {
         if (CurTok == tok_frpar) break;
 
         stmt_t* stmt = parse_stmt(str);
-        if (!stmt) {
-            // Ошибка, нужно очистить уже созданные узлы
-            // (упрощённо возвращаем NULL)
-            return NULL;
+        if (stmt->kind == stmt_expr && stmt->expr->kind == expr_error) return stmt;
+        if (CurTok != tok_eol && CurTok != tok_eof && CurTok != tok_frpar) {
+            expr_t* error = expr_create_error("expected eol");
+            stmt_t* result = malloc(sizeof(stmt_t));
+            result->kind = stmt_expr;
+            result->expr = error;
+            return result;
         }
-
         stmt_list_t* node = malloc(sizeof(stmt_list_t));
         node->stmt = stmt;
         node->next = NULL;
@@ -374,8 +408,6 @@ stmt_t* parse_if_stmt(char** str) {
     return result;
 }
 
-int is_infunction = 0;
-
 stmt_t* parse_return(char** str) {
     getNextToken(str);
     expr_t* _return = parse_expr(str);
@@ -398,7 +430,13 @@ stmt_t* parse_stmt(char** str) {
     case tok_return:
         return parse_return(str);
     default:
-        break;
+        // {
+        //     expr_t* error = expr_create_error("unknown statement");
+        //     stmt_t* result = malloc(sizeof(stmt_t));
+        //     result->expr = stmt_expr;
+        //     result->expr = error;
+        //     return result;
+        // }
     }
     return parse_expr_stmt(str);
 }
@@ -406,8 +444,18 @@ stmt_t* parse_stmt(char** str) {
 top_level_stmt_t* parse_function(char** pos) {
     getNextToken(pos); //eat 'function' keyword
     expr_t* def = parse_expr(pos);
-    stmt_t* body = parse_stmt(pos);
     top_level_stmt_t* top_level = malloc(sizeof(top_level_stmt_t));
+    if (def->kind == expr_error) {
+        top_level->kind = top_level_expr;
+        top_level->expr = def;
+        return top_level;
+    }
+    stmt_t* body = parse_stmt(pos);
+    if (body->kind == stmt_expr && body->expr->kind == expr_error) {
+        top_level->kind = top_level_expr;
+        top_level->expr = body->expr;
+        return top_level;
+    }
     top_level->kind = top_level_func;
     top_level->func_def.definition = def;
     top_level->func_def.body = body;
@@ -437,6 +485,9 @@ top_level_stmt_t* parse_top_stmt(char** pos) {
         default:
             _stmt = parse_top_expr(pos);
             break;
+        }
+        if (_stmt->kind == top_level_expr && _stmt->expr->kind == expr_error) {
+            return _stmt;
         }
         top_level_stmt_list_t* newList = malloc(sizeof(top_level_stmt_list_t));
         newList->_stmt = _stmt;
@@ -491,6 +542,11 @@ int print_tree_expr(expr_t* expr, int tabs) {
         }
         for (int i = 0;i < tabs;++i) putchar(' ');
         printf(")\n");
+        break;
+    case expr_error:
+        printf("%u:%u:error: %s\n", expr->_error.line, expr->_error.column,
+            expr->_error.description);
+        break;
     default:
         break;
     }
@@ -576,6 +632,9 @@ void free_expr(expr_t* expr) {
     case expr_id:
         free((void*)expr->id);
         break;
+    case expr_str:
+        free((void*)expr->id);
+        break;
     case expr_list:
         for (expr_list_t* i = expr->expr_list; i; ) {
             expr_list_t* next = i->next;
@@ -583,6 +642,9 @@ void free_expr(expr_t* expr) {
             free(i);
             i = next;
         }
+        break;
+    case expr_error:
+        free(expr->_error.description);
         break;
     default:
         break;
@@ -597,6 +659,17 @@ void free_stmt_list(stmt_list_t* stmt_list__) {
     }
     if (stmt_list__->next) {
         free_stmt_list(stmt_list__->next);
+    }
+    free(stmt_list__);
+}
+
+void free_top_stmt_list(top_level_stmt_list_t* stmt_list__) {
+    if (!stmt_list__) return;
+    if (stmt_list__->_stmt) {
+        free_top_stmt(stmt_list__->_stmt);
+    }
+    if (stmt_list__->next) {
+        free_top_stmt_list(stmt_list__->next);
     }
     free(stmt_list__);
 }
@@ -625,3 +698,24 @@ void free_stmt(stmt_t* stmt) {
     }
     free(stmt);
 }
+
+void free_top_stmt(top_level_stmt_t* top_stmt) {
+    if (top_stmt == NULL) return;
+    switch (top_stmt->kind)
+    {
+    case top_level_func:
+        free_expr(top_stmt->func_def.definition);
+        free_stmt(top_stmt->func_def.body);
+        break;
+    case top_level_expr:
+        free_expr(top_stmt->expr);
+        break;
+    case top_level_list:
+        free_top_stmt_list(top_stmt->list);
+        break;
+    default:
+        break;
+    }
+    free(top_stmt);
+}
+

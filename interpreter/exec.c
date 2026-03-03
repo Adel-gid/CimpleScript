@@ -9,6 +9,8 @@ typedef struct FunctionData {
     CSObject* result;
 } FunctionData;
 
+extern const char* input;
+
 CSObject* execExpr(CSScope* scope, expr_t* expr) {
     if (expr == NULL) return NULL;
     switch (expr->kind)
@@ -33,9 +35,6 @@ CSObject* execExpr(CSScope* scope, expr_t* expr) {
                 argc = 0;
                 for (expr_list_t* i = args->expr_list; i; i = i->next, ++argc) {
                     argv[argc] = execExpr(scope, i->expr);
-                    if (argv[argc] == 0xbaadf00dbaadf00d) {
-                        print_tree_expr(i->expr, 0);
-                    }
                 }
                 CSObject* result = call(left, argc, argv);
                 for (int i = 0; i < argc; ++i) {
@@ -116,6 +115,14 @@ CSObject* execExpr(CSScope* scope, expr_t* expr) {
         }
     case expr_num:
         return createDoubleObject(expr->number);
+    case expr_str:
+        return createStringObject(expr->str);
+    case expr_error:
+        return createExceptionObject(
+            "SyntaxError",
+            input, expr->_error.line,
+            expr->_error.column, expr->_error.description
+        );
     default:
         break;
     }
@@ -127,18 +134,28 @@ CSObject* execStmt(CSScope* scope, stmt_t* stmt) {
     switch (stmt->kind)
     {
     case stmt_expr:
-        execExpr(scope, stmt->expr);
+    {
+        CSObject* object = execExpr(scope, stmt->expr);
+        if (object->__class__ == getExceptionClass()) {
+            return object;
+        }
         return NULL;
-        break;
+    }
     case stmt_while:
         {
             CSObject* result = NULL;
             while (1) {
                 CSObject* _cond = execExpr(scope, stmt->while_stmt.condition);
+                if (_cond->__class__ == getExceptionClass()) {
+                    return _cond;
+                }
                 int _boolean = toCBool(_cond);
                 decref(_cond);
                 if (!_boolean) break;
                 result = execStmt(scope, stmt->while_stmt.stmt);
+                if (result->__class__ == getExceptionClass()) {
+                    return result;
+                }
                 if (result) break;
             }
             return result;
@@ -146,6 +163,9 @@ CSObject* execStmt(CSScope* scope, stmt_t* stmt) {
     case stmt_if:
         {
             CSObject* _cond = execExpr(scope, stmt->if_stmt.condition);
+            if (_cond->__class__ == getExceptionClass()) {
+                    return _cond;
+            }
             int _boolean = toCBool(_cond);
             decref(_cond);
             CSObject* result = NULL;
@@ -202,7 +222,8 @@ void execTopLevelStmt(CSScope* scope, top_level_stmt_t* top_level) {
             data->scope.parent = scope;
             data->scope.vars = NULL;
             data->stmt = top_level->func_def.body;
-            for (expr_list_t* i = argv->expr_list; i; i = i->next) {
+            data->argc = 0;
+            for (expr_list_t* i = argv->expr_list; i; i = i->next, ++data->argc) {
                 execExpr(&data->scope, i->expr);
             }
         }
@@ -214,13 +235,9 @@ void execTopLevelStmt(CSScope* scope, top_level_stmt_t* top_level) {
         break;
     case top_level_list:
         {
-            CSScope newScope = {
-                .vars = 0, .parent = scope
-            };
             for (top_level_stmt_list_t* i = top_level->list; i; i = i->next) {
-                execTopLevelStmt(&newScope, i->_stmt);
+                execTopLevelStmt(scope, i->_stmt);
             }
-            scopeClean(&newScope);
         }
         break;
     default:

@@ -1,7 +1,7 @@
 #ifndef __PARSER_H__
 #define __PARSER_H__
 
-#include "../interpreter/object.h"
+#include <stddef.h>
 
 typedef struct expr expr_t;
 
@@ -21,6 +21,12 @@ typedef struct expr_list {
     struct expr_list* next;
 } expr_list_t;
 
+typedef struct syntax_error {
+    int line;
+    int column;
+    const char* description;
+} syntax_error_t;
+
 typedef struct expr {
     int kind;
     union {
@@ -29,6 +35,8 @@ typedef struct expr {
         expr_list_t*    expr_list;
         double             number;
         const char*            id;
+        const char*           str;
+        syntax_error_t     _error;
     };
 } expr_t;
 
@@ -37,7 +45,9 @@ enum ExprKind {
     expr_num,
     expr_unop,
     expr_binop,
-    expr_list
+    expr_list,
+    expr_str,
+    expr_error
 };
 
 typedef struct stmt stmt_t;
@@ -145,11 +155,9 @@ int print_tree_expr(expr_t* expr, int tabs);
 int print_tree_stmt(stmt_t* stmt, int tabs);
 int print_tree_top_stmt(top_level_stmt_t* top_stmt, int tabs);
 void free_stmt(stmt_t* stmt);
+void free_top_stmt(top_level_stmt_t* top_stmt);
 
 top_level_stmt_t* parse_code(char* input);
 
-CSObject* execExpr(CSScope* scope, expr_t* expr);
-CSObject* execStmt(CSScope* scope, stmt_t* stmt);
-void      execTopLevelStmt(CSScope* scope, top_level_stmt_t* top_level);
 
 #endif

@@ -1,23 +1,23 @@
 
 CC = gcc
 
-SRC_FOLDERS = parser interpreter
+SRC_FOLDERS = parser compiler
 
 SRC = $(foreach dir,$(SRC_FOLDERS),$(wildcard $(dir)/*.c))
 
 OBJS = $(patsubst %.c, obj/%.o, $(SRC))
 
-all: csi.exe
+all: csc.exe
 
 setup:
-	mkdir obj
-	mkdir obj\interpreter
-	mkdir obj\parser
+	mkdir ..\obj
+	mkdir ..\obj\compiler
+	mkdir ..\obj\parser
 
 obj/%.o:%.c
 	$(CC) -c $< -o $@ \
 	-Wall -Wextra -g \
 	-Wpedantic -mno-red-zone
 
-csi.exe: $(OBJS)
+csc.exe: $(OBJS)
 	$(CC) -g $^ -o $@

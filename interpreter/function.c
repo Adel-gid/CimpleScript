@@ -15,9 +15,16 @@ CSObject* functionCall(CSObject* self, int argc, CSObject** argv) {
     CSScope callScope;
     callScope.parent = data->scope.parent; // Замыкание
     callScope.vars = NULL;
-    for (int i = argc; i > 0; --i) {
+    for (int i = data->argc; i > 0; --i, --argc) {
         CSObject* newVar = scopeCreate(&callScope, vars->name, vars->object->__class__->name);
-        set(newVar, argv[i-1]);
+        CSObject* toInsert = NULL;
+        if (argc) {
+            toInsert = argv[argc-1];
+        }
+        else {
+            toInsert = vars->object;
+        }
+        set(newVar, toInsert);
         vars = vars->next;
     }
     data->result = execStmt(&callScope, data->stmt);

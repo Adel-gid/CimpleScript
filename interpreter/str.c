@@ -27,6 +27,16 @@ CSObject* strAdd(CSObject* left, CSObject* right) {
     return newStr;
 }
 
+CSObject* strSet(CSObject* left, CSObject* right) {
+    TYPE_CHECK(left, "str");
+    TYPE_CHECK(right, "str");
+    StringObject* objData1 = left->objectData;
+    StringObject* objData2 = right->objectData;
+    free(objData1->__cstr);
+    objData1->__cstr = strdup(objData2->__cstr);
+    return left;
+}
+
 CSObject* strStr(CSObject* _str) {
     return _str;
 }

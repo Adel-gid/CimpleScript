@@ -205,3 +205,87 @@ CSObject* call(CSObject* self, int argc, CSObject** argv) {
     CSObject* new = self->__class__->interface->__call__(self, argc, argv);
     return new;
 }
+
+CSObject* getIndex(CSObject* self, CSObject* index) {
+    if (self == NULL) return createExceptionObject(
+        "NullObjectError",
+        NULL, 0, 0, "NullObject"
+    );
+    if (self->__class__ == NULL) return createExceptionObject(
+        "NullClassError",
+        NULL, 0, 0, "NullClassError"
+    );
+    if (self->__class__->interface == NULL) return createExceptionObject(
+        "NullInterfaceError",
+        NULL, 0, 0, "NullInterfaceError"
+    );
+    if (self->__class__->interface->__getindex__ == NULL) return createExceptionObject(
+        "NullMethodError",
+        NULL, 0, 0, "NullMethodError"
+    );
+    CSObject* new = self->__class__->interface->__getindex__(self, index);
+    return new;
+}
+
+CSObject* setIndex(CSObject* self, CSObject* index, CSObject* toInsert) {
+    if (self == NULL) return createExceptionObject(
+        "NullObjectError",
+        NULL, 0, 0, "NullObject"
+    );
+    if (self->__class__ == NULL) return createExceptionObject(
+        "NullClassError",
+        NULL, 0, 0, "NullClassError"
+    );
+    if (self->__class__->interface == NULL) return createExceptionObject(
+        "NullInterfaceError",
+        NULL, 0, 0, "NullInterfaceError"
+    );
+    if (self->__class__->interface->__getindex__ == NULL) return createExceptionObject(
+        "NullMethodError",
+        NULL, 0, 0, "NullMethodError"
+    );
+    CSObject* new = self->__class__->interface->__setindex__(self, index, toInsert);
+    return new;
+}
+
+CSObject* getAttr(CSObject* self, CSObject* index) {
+    if (self == NULL) return createExceptionObject(
+        "NullObjectError",
+        NULL, 0, 0, "NullObject"
+    );
+    if (self->__class__ == NULL) return createExceptionObject(
+        "NullClassError",
+        NULL, 0, 0, "NullClassError"
+    );
+    if (self->__class__->interface == NULL) return createExceptionObject(
+        "NullInterfaceError",
+        NULL, 0, 0, "NullInterfaceError"
+    );
+    if (self->__class__->interface->__getattr__ == NULL) return createExceptionObject(
+        "NullMethodError",
+        NULL, 0, 0, "NullMethodError"
+    );
+    CSObject* new = self->__class__->interface->__getattr__(self, index);
+    return new;
+}
+
+CSObject* setAttr(CSObject* self, CSObject* index, CSObject* toInsert) {
+    if (self == NULL) return createExceptionObject(
+        "NullObjectError",
+        NULL, 0, 0, "NullObject"
+    );
+    if (self->__class__ == NULL) return createExceptionObject(
+        "NullClassError",
+        NULL, 0, 0, "NullClassError"
+    );
+    if (self->__class__->interface == NULL) return createExceptionObject(
+        "NullInterfaceError",
+        NULL, 0, 0, "NullInterfaceError"
+    );
+    if (self->__class__->interface->__getattr__ == NULL) return createExceptionObject(
+        "NullMethodError",
+        NULL, 0, 0, "NullMethodError"
+    );
+    CSObject* new = self->__class__->interface->__setattr__(self, index, toInsert);
+    return new;
+}

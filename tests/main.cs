@@ -1,17 +1,8 @@
-
-function add(left:double, right:double) {
-    return left + right
+function default(n:double = 10) {
+    return n
 }
 
-function fibonacci(n: double) {
-    if n <= 0 {
-        return 0
-    }
-    if n == 1 {
-        return 1
-    }
-    return fibonacci(n - 1) + fibonacci(n - 2)
+function main() {
+    print("hello " + "world")
+    print(default(12))
 }
-
-print(add(1, 2))
-print(fibonacci(10))

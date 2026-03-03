@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include "../parser/parser.h"
+
 typedef struct CSObject CSObject;
 
 typedef CSObject*(*CSAddMethod)(CSObject*, CSObject*);
@@ -20,22 +22,30 @@ typedef CSObject*(*CSEqualMethod)(CSObject*, CSObject*);
 typedef CSObject*(*CSDeleteMethod)(CSObject*);
 typedef CSObject*(*CSCallMethod)(CSObject*, int, CSObject**);
 typedef CSObject*(*CSSetMethod)(CSObject*, CSObject*);
+typedef CSObject*(*CSGetIndexMethod)(CSObject*, CSObject*);
+typedef CSObject*(*CSSetIndexMethod)(CSObject*, CSObject*, CSObject*);
+typedef CSObject*(*CSGetAttributeMethod)(CSObject*, CSObject*);
+typedef CSObject*(*CSSetAttributeMethod)(CSObject*, CSObject*, CSObject*);
 
 typedef struct CSInterface {
-    CSAddMethod             __add__;
-    CSMulMethod             __mul__;
-    CSSubMethod             __sub__;
-    CSDivMethod             __div__;
-    CSNegMethod             __neg__;
-    CSStrMethod             __str__;
-    CSLessThanMethod         __lt__;
-    CSLessOrEqualMethod      __le__;
-    CSGreaterThanMethod      __gt__;
-    CSGreaterOrEqualMethod   __ge__;
-    CSDeleteMethod          __del__;
-    CSCallMethod           __call__;
-    CSSetMethod             __set__;
-    CSEqualMethod            __eq__;
+    CSAddMethod                __add__;
+    CSMulMethod                __mul__;
+    CSSubMethod                __sub__;
+    CSDivMethod                __div__;
+    CSNegMethod                __neg__;
+    CSStrMethod                __str__;
+    CSLessThanMethod            __lt__;
+    CSLessOrEqualMethod         __le__;
+    CSGreaterThanMethod         __gt__;
+    CSGreaterOrEqualMethod      __ge__;
+    CSDeleteMethod             __del__;
+    CSCallMethod              __call__;
+    CSSetMethod                __set__;
+    CSEqualMethod               __eq__;
+    CSGetIndexMethod      __getindex__;
+    CSSetIndexMethod      __setindex__;
+    CSGetAttributeMethod   __getattr__;
+    CSSetAttributeMethod   __setattr__;
 } CSInterface;
 
 typedef struct CSClass {
@@ -64,6 +74,9 @@ CSObject* createExceptionObject(
 );
 
 CSClass* getDoubleClass();
+CSClass* getIntClass();
+CSClass* getUIntClass();
+CSClass* getArrayClass();
 CSClass* getStringClass();
 CSClass* getBoolClass();
 CSClass* getBuiltinFuncClass();
@@ -86,6 +99,10 @@ CSObject* le(CSObject* left, CSObject* right);
 CSObject* ge(CSObject* left, CSObject* right);
 CSObject* eq(CSObject* left, CSObject* right);
 CSObject* set(CSObject* left, CSObject* right);
+CSObject* getIndex(CSObject* self, CSObject* index);
+CSObject* setIndex(CSObject* self, CSObject* index, CSObject* toInsert);
+CSObject* getAttr(CSObject* self, CSObject*);
+CSObject* setAttr(CSObject* self, CSObject*, CSObject*);
 
 #define TYPE_CHECK(x, className) do {if (strcmp((x)->__class__->name, className) != 0) {\
     return createExceptionObject("TypeError", NULL, 0, 0, "Error type of object");}} while (0)
@@ -101,6 +118,8 @@ typedef struct CSScope {
     struct CSScope* parent;
 } CSScope;
 
+CSClass* getExceptionClass();
+
 CSClass* getClassByName(const char* name);
 void registerClass(CSClass* _class);
 
@@ -113,5 +132,10 @@ void scopeClean(CSScope* scope);
 CSObject* createBuiltinFunction(CSCallMethod func);
 
 int toCBool(CSObject* object);
+
+
+CSObject* execExpr(CSScope* scope, expr_t* expr);
+CSObject* execStmt(CSScope* scope, stmt_t* stmt);
+void      execTopLevelStmt(CSScope* scope, top_level_stmt_t* top_level);
 
 #endif

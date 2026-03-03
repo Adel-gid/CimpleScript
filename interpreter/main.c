@@ -40,6 +40,10 @@ int execFile(const char* filename) {
     top_level_stmt_t* stmt = parse_code(input);
     free(fileData);
     execTopLevelStmt(&globalScope, stmt);
+    CSObject* mainFunc = scopeGet(&globalScope, "main");
+    CSObject* result = call(mainFunc, 0, NULL);
+    CSPrint(NULL, 1, &result);
+    free_top_stmt(stmt);
     return 0;
 }
 
