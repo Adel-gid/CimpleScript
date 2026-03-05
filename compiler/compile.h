@@ -27,11 +27,12 @@ enum LocationType {
 
 typedef struct object {
     class_t* _class;
-    location_t loc;
 } object_t;
 
-typedef int(*PFNCSCAdd)(char* buff, int buffsize, object_t*, object_t*);
-typedef int(*PFNCSCSub)(char* buff, int buffsize, object_t*, object_t*);
+
+
+typedef object_t*(*PFNCSCAdd)(object_t*, object_t*);
+typedef object_t*(*PFNCSCSub)(char* buff, int buffsize, object_t*, object_t*);
 typedef struct CSCInterface {
     PFNCSCAdd add;
     PFNCSCSub sub;
@@ -69,8 +70,7 @@ void registerClass(class_t* _class);
 
 location_t getArgLoc(int argNo);
 
-int add(char* buff, int buffsize, object_t* l, object_t* r);
-int sub(char* buff, int buffsize, object_t* l, object_t* r);
+object_t* add(ir_t* ir, object_t* left, object_t* right);
 
 typedef struct constant_pool_node {
     int kind;
@@ -97,10 +97,17 @@ int getConstant(constant_pool_t* pool, int kind, ...);
 void appendConstant(constant_pool_t* head, int kind, ...);
 void destroyConstantPool(constant_pool_t* pool);
 
+typedef struct ir_operand {
+    object_t* left;
+    object_t* right;
+    object_t* dest;
+    int op;
+} ir_operand_t;
+
 typedef struct ir_node {
     int kind;
     union {
-        uint64_t       imm;
+        ir_operand_t operand;
         const char*  label;
     };
     struct ir* next;
